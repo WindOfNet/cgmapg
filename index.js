@@ -45,6 +45,7 @@ function checkEnvironmentVariables() {
 function parseArguments() {
   const args = process.argv.slice(2);
   let datFilePath = null;
+  let scale = 1; // 預設值為 1
 
   // 尋找 --dat 參數
   const datIndex = args.indexOf('--dat');
@@ -52,9 +53,20 @@ function parseArguments() {
     datFilePath = args[datIndex + 1];
   }
 
+  // 尋找 --scale 參數
+  const scaleIndex = args.indexOf('--scale');
+  if (scaleIndex !== -1 && scaleIndex + 1 < args.length) {
+    const scaleValue = parseInt(args[scaleIndex + 1]);
+    if (isNaN(scaleValue) || scaleValue < 1 || scaleValue > 10) {
+      console.log('❌ scale 參數必須是 1 到 10 之間的整數');
+      return null;
+    }
+    scale = scaleValue;
+  }
+
   if (!datFilePath) {
     console.log('❌ 請提供 .dat 檔案路徑');
-    console.log('使用方式: npm run start -- --dat D:\\path\\to\\file.dat');
+    console.log('使用方式: npm run start -- --dat D:\\path\\to\\file.dat [--scale 1-10]');
     return null;
   }
 
@@ -68,7 +80,7 @@ function parseArguments() {
     return null;
   }
 
-  return datFilePath;
+  return { datFilePath, scale };
 }
 
 /**
@@ -161,10 +173,11 @@ async function processIniFile(filePath) {
 /**
  * 執行 DOSBox
  */
-async function runDOSBox(datFilePath) {
+async function runDOSBox(datFilePath, scale = 1) {
   const cgPath = process.env.CG_PATH;
 
   console.log('\n🚀 啟動 DOSBox...');
+  console.log(`📏 縮放比例: ${scale}`);
 
   const dosboxPath = path.join(__dirname, 'dosbox-x\\mingw-build\\mingw');
   const dosboxExe = path.join(dosboxPath, 'dosbox-x.exe');
@@ -190,7 +203,7 @@ async function runDOSBox(datFilePath) {
     `-c "mount c ${path.join(__dirname, 'see4cg')}"`,
     `-c "mount d ${cgPath}"`,
     `-c "C:"`,
-    `-c "cmap ${datFileName.split('\\').at(-1).replace('.dat', '')} 1"`,
+    `-c "cmap ${datFileName.split('\\').at(-1).replace('.dat', '')} ${scale}"`,
     `-c "exit"`,
   ].join(' ');
 
@@ -217,19 +230,22 @@ async function main() {
   }
 
   // 解析命令列參數
-  const datFilePath = parseArguments();
-  if (!datFilePath) {
+  const params = parseArguments();
+  if (!params) {
     process.exit(1);
   }
 
+  const { datFilePath, scale } = params;
+
   console.log(`\n📁 目標檔案: ${datFilePath}`);
+  console.log(`📏 縮放比例: ${scale}`);
 
   try {
     // 處理設定檔案
     await processConfigFiles(datFilePath);
 
     // 執行 DOSBox
-    await runDOSBox(datFilePath);
+    await runDOSBox(datFilePath, scale);
 
     console.log('\n🎉 處理完成！');
   } catch (error) {
